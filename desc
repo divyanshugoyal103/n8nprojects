@@ -1,0 +1,39 @@
+Simplified LinkedIn Job Hunter - Easy Setup
+I've created a completely simplified workflow that avoids the common issues. This version:
+
+Eliminates the PDF handling that was causing problems (no resume file handling)
+Uses standard n8n nodes to improve compatibility
+Simplifies the data flow to reduce potential points of failure
+Doesn't require AI integration which can sometimes be complex to set up
+
+How to Set Up This Workflow:
+
+Import the JSON into your n8n instance
+Edit the "Set Job Search Parameters" node to configure:
+
+linkedinSearchUrl: Your LinkedIn search URL with all filters applied
+emailRecipient: Your email address
+apifyApiKey: Your Apify API key
+jobPreferences: Description of what you're looking for (for reference in the email)
+
+
+Configure Email Settings:
+
+Update the "Send Email" node with your SMTP settings or authentication
+You can change the "fromEmail" address to something you prefer
+
+
+
+What This Workflow Does:
+
+Runs daily at 8:00 AM (configurable)
+Scrapes LinkedIn jobs using Apify (no login required)
+Processes job data into a clean format
+Creates an HTML email with job listings
+Sends you the top 10 jobs that match your search URL
+
+Troubleshooting Tips:
+
+If you get an error with Apify, double-check your API key
+Make sure your LinkedIn search URL is from a private/incognito browser session
+If emails aren't sending, check your email credentials in n8n
