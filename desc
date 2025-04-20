@@ -36,4 +36,4 @@ Troubleshooting Tips:
 
 If you get an error with Apify, double-check your API key
 Make sure your LinkedIn search URL is from a private/incognito browser session
-If emails aren't sending, check your email credentials in n8n
+If emails aren't sending, check your email credentials in n8n.
