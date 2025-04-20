@@ -1,0 +1,193 @@
+{
+  "name": "LinkedIn Job Hunter",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "expression": "8"
+            }
+          ]
+        }
+      },
+      "id": "f71e8d9a-7b40-4e3a-9d97-c5211cb9707a",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.linkedin.com/jobs/search?keywords={{$node[\"Set Job Search Parameters\"].json[\"keywords\"]}}&location={{$node[\"Set Job Search Parameters\"].json[\"location\"]}}&distance={{$node[\"Set Job Search Parameters\"].json[\"distance\"]}}&f_TPR=r{{$node[\"Set Job Search Parameters\"].json[\"timePosted\"]}}&position=1&pageNum=0",
+        "options": {}
+      },
+      "id": "3cf609ee-5453-4598-9b78-4310962d5b36",
+      "name": "LinkedIn Search Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Define your search parameters here\nreturn {\n  keywords: \"software developer\", // Job title or keywords\n  location: \"United States\", // Location\n  distance: \"25\", // Distance in miles\n  timePosted: \"24\", // Time posted in hours (r24 = last 24 hours)\n  maxResults: 10 // Maximum number of results to include in email\n};"
+      },
+      "id": "a4d5bf7f-1234-4f56-a78d-12c5678d901b",
+      "name": "Set Job Search Parameters",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "extractionValues": {
+          "values": [
+            {
+              "key": "jobs",
+              "cssSelector": "li.jobs-search-results__list-item",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c34d56e-9876-4321-bd81-987c543f210a",
+      "name": "Extract Job Listings",
+      "type": "n8n-nodes-base.htmlExtract",
+      "typeVersion": 1,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process the extracted HTML to get structured job data\nconst jobs = [];\nconst maxResults = $node[\"Set Job Search Parameters\"].json.maxResults;\nconst extractedJobs = $input.all()[0].json.jobs;\n\nfor (let i = 0; i < Math.min(extractedJobs.length, maxResults); i++) {\n  const jobHtml = extractedJobs[i];\n  \n  // Use regex to extract job information\n  const titleMatch = jobHtml.match(/<h3 class=\".*?\">(.*?)<\\/h3>/i);\n  const companyMatch = jobHtml.match(/<a.*?class=\"job-search-card__subtitle-link.*?\">(.*?)<\\/a>/i);\n  const locationMatch = jobHtml.match(/<span class=\"job-search-card__location\">(.*?)<\\/span>/i);\n  const linkMatch = jobHtml.match(/<a class=\"job-search-card__link.*?href=\"(.*?)\".*?>/i);\n  const timeMatch = jobHtml.match(/<time.*?>(.*?)<\\/time>/i);\n  \n  if (titleMatch && companyMatch) {\n    jobs.push({\n      title: titleMatch[1].trim(),\n      company: companyMatch[1].trim(),\n      location: locationMatch ? locationMatch[1].trim() : 'Not specified',\n      link: linkMatch ? linkMatch[1].trim() : '',\n      postedTime: timeMatch ? timeMatch[1].trim() : 'Recently',\n    });\n  }\n}\n\nreturn { jobs };"
+      },
+      "id": "b83e4c7a-4567-89ab-cdef-1234567890ab",
+      "name": "Process Job Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate an HTML email with the job listings\nconst jobs = $input.all()[0].json.jobs;\nconst searchParams = $node[\"Set Job Search Parameters\"].json;\nconst today = new Date().toLocaleDateString();\n\nlet emailHtml = `\n<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n    .container { max-width: 600px; margin: 0 auto; padding: 20px; }\n    h1 { color: #0077b5; }\n    .job-item { border-bottom: 1px solid #eee; padding: 15px 0; }\n    .job-title { color: #0077b5; font-weight: bold; margin-bottom: 5px; }\n    .job-company { font-weight: bold; }\n    .job-meta { color: #666; font-size: 0.9em; }\n    .no-jobs { color: #666; font-style: italic; }\n  </style>\n</head>\n<body>\n  <div class=\"container\">\n    <h1>Your Daily LinkedIn Job Matches</h1>\n    <p>Here are today's (${today}) job matches for: <strong>${searchParams.keywords}</strong> in <strong>${searchParams.location}</strong></p>\n`;\n\nif (jobs.length > 0) {\n  jobs.forEach(job => {\n    emailHtml += `\n    <div class=\"job-item\">\n      <div class=\"job-title\">${job.title}</div>\n      <div class=\"job-company\">${job.company}</div>\n      <div class=\"job-meta\">\n        <span>${job.location}</span> • \n        <span>Posted: ${job.postedTime}</span>\n      </div>\n      <p><a href=\"${job.link || 'https://www.linkedin.com/jobs/'}\" target=\"_blank\">View Job on LinkedIn</a></p>\n    </div>\n    `;\n  });\n} else {\n  emailHtml += `<p class=\"no-jobs\">No jobs matching your criteria were found today. Try adjusting your search parameters.</p>`;\n}\n\nemailHtml += `\n    <p>This email was sent automatically from your n8n LinkedIn Job Hunter.</p>\n  </div>\n</body>\n</html>\n`;\n\nreturn {\n  html: emailHtml,\n  subject: `LinkedIn Job Matches: ${searchParams.keywords} (${today})`,\n  jobs: jobs\n};"
+      },
+      "id": "de12f34g-5678-90hi-jklm-1234567890cd",
+      "name": "Format Email",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "jobs@yourdomain.com",
+        "toEmail": "your-email@example.com",
+        "subject": "={{ $node[\"Format Email\"].json[\"subject\"] }}",
+        "html": "={{ $node[\"Format Email\"].json[\"html\"] }}",
+        "options": {}
+      },
+      "id": "f9e8d7c6-5432-1098-b765-432109876543",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Job Search Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Job Search Parameters": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Search Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Search Request": {
+      "main": [
+        [
+          {
+            "node": "Extract Job Listings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Job Listings": {
+      "main": [
+        [
+          {
+            "node": "Process Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Job Data": {
+      "main": [
+        [
+          {
+            "node": "Format Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "version": 1,
+  "staticData": null,
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 0
+}
